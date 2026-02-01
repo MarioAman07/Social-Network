@@ -4,6 +4,7 @@ const path = require('path');
 const { connectToDb, getDb } = require('./src/config/db');
 
 // connecting routes
+const commentRoutes = require('./src/routes/commentRoutes');
 const userRoutes = require('./src/routes/userRoutes');
 const postRoutes = require('./src/routes/postRoutes');
 
@@ -18,6 +19,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 // Подключение API Роутов
 app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
+app.use('/api/comments', commentRoutes);
 
 // Database Connection & Server Start
 let db;

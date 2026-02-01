@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>My Profile</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body onload="loadStats()">
+  <div class="container">
+    <nav class="nav">
+      <a class="nav-link" href="feed.html">🏠 Feed</a>
+      <a class="nav-link active" href="profile.html">👤 Profile</a>
+      <button class="nav-link nav-btn" onclick="logout()">🚪 Exit</button>
+    </nav>
+
+    <section class="card">
+      <h1 class="page-title">My Statistics</h1>
+      <p class="muted">Data calculated via MongoDB Aggregation Pipeline</p>
+    </section>
+
+    <section id="stats-view" class="card">
+      <p class="muted center">Loading...</p>
+    </section>
+  </div>
+
+  <script src="js/app.js"></script>
+</body>
+</html>
