@@ -4,7 +4,7 @@ const { MongoClient, ObjectId } = require('mongodb');
 const uri = process.env.MONGO_URI;
 
 if (!uri) {
-    console.error("ОШИБКА: Не найдена строка MONGO_URI в файле .env");
+    console.error("ERROR: MONGO_URI was not found in the .env file");
     process.exit(1);
 }
 
@@ -12,10 +12,11 @@ const client = new MongoClient(uri);
 
 async function run() {
   try {
-    console.log("⏳ Подключаюсь к Atlas...");
+    console.log("Connecting to MongoDB Atlas...");
     await client.connect();
     const db = client.db("social_network_final");
-    console.log("🧹 Очистка коллекций...");
+
+    console.log("Clearing collections...");
     await db.collection("users").deleteMany({});
     await db.collection("posts").deleteMany({});
     await db.collection("comments").deleteMany({});
@@ -23,13 +24,13 @@ async function run() {
     const user2Id = new ObjectId();
     const post1Id = new ObjectId();
 
-    console.log("👤 Создаю пользователей...");
+    console.log("Creating users...");
     const users = [
       {
         _id: user1Id,
         username: "aman_dev",
         email: "aman@example.com",
-        password_hash: "hashed_secret_password", 
+        password_hash: "hashed_secret_password",
         bio: "Fullstack Developer",
         avatar_url: "https://i.pravatar.cc/150?u=aman",
         created_at: new Date(),
@@ -48,56 +49,56 @@ async function run() {
     ];
     await db.collection("users").insertMany(users);
 
-    console.log("📝 Создаю посты...");
+    console.log("Creating posts...");
     const posts = [
       {
         _id: post1Id,
         user_id: user1Id,
-        author_info: { 
-            username: "aman_dev", 
-            avatar_url: "https://i.pravatar.cc/150?u=aman" 
+        author_info: {
+          username: "aman_dev",
+          avatar_url: "https://i.pravatar.cc/150?u=aman"
         },
-        content: "Привет! Это мой первый пост в MongoDB Atlas 🚀",
+        content: "Hello! This is my first post in MongoDB Atlas.",
         image_url: "https://placehold.co/600x400",
         created_at: new Date(),
-        metrics: { 
-            views: 120, 
-            likes_count: 5, 
-            comments_count: 2
+        metrics: {
+          views: 120,
+          likes_count: 5,
+          comments_count: 2
         },
-        last_likes: [] 
+        last_likes: []
       }
     ];
     await db.collection("posts").insertMany(posts);
 
-    console.log("💬 Создаю комментарии...");
+    console.log("Creating comments...");
     const comments = [
       {
         post_id: post1Id,
         user_id: user2Id,
         author_name: "alice_wonder",
-        text: "Вау, крутая архитектура базы данных! 🔥",
+        text: "Wow, great database architecture!",
         created_at: new Date()
       },
       {
         post_id: post1Id,
         user_id: user1Id,
         author_name: "aman_dev",
-        text: "Спасибо! Старался использовать Native Driver.",
-        created_at: new Date(Date.now() + 60000) // Через минуту
+        text: "Thanks! I tried to use the Native MongoDB Driver.",
+        created_at: new Date(Date.now() + 60000) // one minute later
       }
     ];
     await db.collection("comments").insertMany(comments);
 
-    console.log("⚡ Создаю индексы...");
+    console.log("Creating indexes...");
     await db.collection("users").createIndex({ email: 1 }, { unique: true });
     await db.collection("posts").createIndex({ user_id: 1, created_at: -1 });
     await db.collection("comments").createIndex({ post_id: 1, created_at: 1 });
 
-    console.log("(Users + Posts + Comments)!");
+    console.log("Seeding completed (Users, Posts, Comments).");
 
   } catch (err) {
-    console.error(" Ошибка:", err);
+    console.error("Error:", err);
   } finally {
     await client.close();
   }

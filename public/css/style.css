@@ -258,3 +258,45 @@ body{
   text-align: center;
   background: var(--card);
 }
+
+/* owner actions */
+.post-owner-actions{
+    margin-left: auto;
+    display: flex;
+    gap: 8px;
+  }
+  
+  .post-action-btn{
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text);
+    border-radius: 12px;
+    padding: 8px 12px;
+    cursor: pointer;
+    font-weight: 800;
+  }
+  
+  .post-action-btn:hover{ filter: brightness(0.98); }
+  
+  .post-action-btn.danger{
+    border-color: rgba(224,49,49,0.35);
+    background: var(--danger-bg);
+    color: var(--danger);
+  }
+  
+  /* edit mode */
+  .edit-box{
+    margin-top: 10px;
+    display: grid;
+    gap: 10px;
+  }
+  
+  .edit-actions{
+    display: flex;
+    gap: 10px;
+  }
+  
+  .edit-actions .btn{
+    width: auto;
+  }
+  

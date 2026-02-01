@@ -2,9 +2,13 @@
 const { getDb } = require('../config/db');
 const { ObjectId } = require('mongodb');
 
+function safeObjectId(id) {
+  try { return new ObjectId(id); } catch { return null; }
+}
+
 module.exports = {
   // ===============================
-  // GET ALL POSTS (SYNCED DATA)
+  // GET ALL POSTS (aggregation)
   // ===============================
   getAllPosts: async (req, res) => {
     try {
@@ -13,7 +17,6 @@ module.exports = {
       const posts = await db.collection('posts').aggregate([
         { $sort: { created_at: -1 } },
 
-        // comments
         {
           $lookup: {
             from: 'comments',
@@ -22,8 +25,6 @@ module.exports = {
             as: 'post_comments'
           }
         },
-
-        // author
         {
           $lookup: {
             from: 'users',
@@ -38,17 +39,11 @@ module.exports = {
             preserveNullAndEmptyArrays: true
           }
         },
-
-        // computed counters (single source of truth)
         {
           $addFields: {
             commentsCount: { $size: '$post_comments' },
             likesCount: {
-              $cond: [
-                { $isArray: '$likes' },
-                { $size: '$likes' },
-                0
-              ]
+              $cond: [{ $isArray: '$likes' }, { $size: '$likes' }, 0]
             }
           }
         }
@@ -61,19 +56,135 @@ module.exports = {
   },
 
   // ===============================
+  // BONUS: TOP POSTS (aggregation)
+  // GET /api/posts/top
+  // ===============================
+  getTopPosts: async (req, res) => {
+    try {
+      const db = getDb();
+
+      const top = await db.collection('posts').aggregate([
+        {
+          $addFields: {
+            likesCount: {
+              $cond: [{ $isArray: '$likes' }, { $size: '$likes' }, 0]
+            }
+          }
+        },
+        { $sort: { likesCount: -1, created_at: -1 } },
+        { $limit: 5 },
+        // join author for display
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'user_id',
+            foreignField: '_id',
+            as: 'author_details'
+          }
+        },
+        {
+          $unwind: {
+            path: '$author_details',
+            preserveNullAndEmptyArrays: true
+          }
+        }
+      ]).toArray();
+
+      res.json(top);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  // ===============================
+  // GET ONE POST
+  // GET /api/posts/:id
+  // ===============================
+  getPostById: async (req, res) => {
+    try {
+      const db = getDb();
+      const postId = safeObjectId(req.params.id);
+      if (!postId) return res.status(400).json({ error: 'Invalid post id' });
+
+      const post = await db.collection('posts').aggregate([
+        { $match: { _id: postId } },
+        {
+          $lookup: {
+            from: 'comments',
+            localField: '_id',
+            foreignField: 'post_id',
+            as: 'post_comments'
+          }
+        },
+        {
+          $lookup: {
+            from: 'users',
+            localField: 'user_id',
+            foreignField: '_id',
+            as: 'author_details'
+          }
+        },
+        {
+          $unwind: {
+            path: '$author_details',
+            preserveNullAndEmptyArrays: true
+          }
+        },
+        {
+          $addFields: {
+            commentsCount: { $size: '$post_comments' },
+            likesCount: {
+              $cond: [{ $isArray: '$likes' }, { $size: '$likes' }, 0]
+            }
+          }
+        }
+      ]).toArray();
+
+      if (!post.length) return res.status(404).json({ error: 'Post not found' });
+      res.json(post[0]);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  // ===============================
+  // GET COMMENTS OF POST
+  // GET /api/posts/:id/comments
+  // ===============================
+  getPostComments: async (req, res) => {
+    try {
+      const db = getDb();
+      const postId = safeObjectId(req.params.id);
+      if (!postId) return res.status(400).json({ error: 'Invalid post id' });
+
+      const comments = await db.collection('comments')
+        .find({ post_id: postId })
+        .sort({ created_at: 1 })
+        .toArray();
+
+      res.json(comments);
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  // ===============================
   // CREATE POST
+  // POST /api/posts
   // ===============================
   createPost: async (req, res) => {
     try {
       const db = getDb();
       const { user_id, content } = req.body;
 
-      const newPost = {
-        user_id: new ObjectId(user_id),
-        content,
-        created_at: new Date(),
+      const userId = safeObjectId(user_id);
+      if (!userId) return res.status(400).json({ error: 'Invalid user id' });
+      if (!content || !content.trim()) return res.status(400).json({ error: 'Content is required' });
 
-        // ✅ likes as array of userIds (for like/unlike)
+      const newPost = {
+        user_id: userId,
+        content: content.trim(),
+        created_at: new Date(),
         likes: []
       };
 
@@ -85,42 +196,101 @@ module.exports = {
   },
 
   // ===============================
-  // LIKE / UNLIKE (TOGGLE)
+  // UPDATE POST (Advanced update: $set)
+  // PUT /api/posts/:id
+  // Body: { userId, content }
   // ===============================
+  updatePost: async (req, res) => {
+    try {
+      const db = getDb();
+      const postId = safeObjectId(req.params.id);
+      if (!postId) return res.status(400).json({ error: 'Invalid post id' });
+
+      const userId = safeObjectId(req.body.userId);
+      if (!userId) return res.status(400).json({ error: 'Invalid userId' });
+
+      const content = (req.body.content || '').trim();
+      if (!content) return res.status(400).json({ error: 'Content is required' });
+
+      // authorization: only author can update
+      const post = await db.collection('posts').findOne({ _id: postId }, { projection: { user_id: 1 } });
+      if (!post) return res.status(404).json({ error: 'Post not found' });
+      if (!post.user_id.equals(userId)) return res.status(403).json({ error: 'Forbidden' });
+
+      await db.collection('posts').updateOne(
+        { _id: postId },
+        { $set: { content } }
+      );
+
+      res.json({ message: 'Post updated' });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  // DELETE POST (Advanced delete + cascade)
+  // DELETE /api/posts/:id
+  // Body: { userId }
+  deletePost: async (req, res) => {
+    try {
+      const db = getDb();
+      const postId = safeObjectId(req.params.id);
+      if (!postId) return res.status(400).json({ error: 'Invalid post id' });
+
+      const userId = safeObjectId(req.body.userId);
+      if (!userId) return res.status(400).json({ error: 'Invalid userId' });
+
+      // authorization: only author can delete
+      const post = await db.collection('posts').findOne({ _id: postId }, { projection: { user_id: 1 } });
+      if (!post) return res.status(404).json({ error: 'Post not found' });
+      if (!post.user_id.equals(userId)) return res.status(403).json({ error: 'Forbidden' });
+
+      // cascade delete comments
+      await db.collection('comments').deleteMany({ post_id: postId });
+      await db.collection('posts').deleteOne({ _id: postId });
+
+      res.json({ message: 'Post and its comments deleted' });
+    } catch (err) {
+      res.status(500).json({ error: err.message });
+    }
+  },
+
+  // LIKE / UNLIKE (toggle)
+  // POST /api/posts/:id/like
+  // Body: { userId }
   likePost: async (req, res) => {
     try {
       const db = getDb();
-      const postId = new ObjectId(req.params.id);
-      const userId = new ObjectId(req.body.userId);
+      const postId = safeObjectId(req.params.id);
+      const userId = safeObjectId(req.body.userId);
 
-      // 1) Find post first
+      if (!postId) return res.status(400).json({ error: 'Invalid post id' });
+      if (!userId) return res.status(400).json({ error: 'Invalid userId' });
+
       const post = await db.collection('posts').findOne(
         { _id: postId },
         { projection: { likes: 1 } }
       );
 
-      if (!post) {
-        return res.status(404).json({ error: 'Post not found' });
-      }
+      if (!post) return res.status(404).json({ error: 'Post not found' });
 
-      // 2) Check if already liked
       const likes = Array.isArray(post.likes) ? post.likes : [];
       const alreadyLiked = likes.some(id => id.equals(userId));
 
-      // 3) Toggle
       if (alreadyLiked) {
         await db.collection('posts').updateOne(
           { _id: postId },
           { $pull: { likes: userId } }
         );
         return res.json({ success: true, liked: false });
-      } else {
-        await db.collection('posts').updateOne(
-          { _id: postId },
-          { $addToSet: { likes: userId } }
-        );
-        return res.json({ success: true, liked: true });
       }
+
+      await db.collection('posts').updateOne(
+        { _id: postId },
+        { $addToSet: { likes: userId } }
+      );
+
+      res.json({ success: true, liked: true });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
