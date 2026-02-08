@@ -2,27 +2,20 @@
 const express = require('express');
 const router = express.Router();
 const postController = require('../controllers/postController');
+const auth = require('../middleware/auth');
 
-// BONUS aggregation
+
+// публичные чтения
 router.get('/top', postController.getTopPosts);
-
-// READ
 router.get('/', postController.getAllPosts);
 router.get('/:id', postController.getPostById);
-
-// COMMENTS for post (Read comments of post)
 router.get('/:id/comments', postController.getPostComments);
 
-// CREATE
-router.post('/', postController.createPost);
+// дальше — только с токеном
+router.post('/', auth, postController.createPost);
+router.put('/:id', auth, postController.updatePost);
+router.delete('/:id', auth, postController.deletePost);
+router.post('/:id/like', auth, postController.likePost);
 
-// UPDATE
-router.put('/:id', postController.updatePost);
-
-// ADVANCED DELETE (cascade)
-router.delete('/:id', postController.deletePost);
-
-// LIKE/UNLIKE
-router.post('/:id/like', postController.likePost);
 
 module.exports = router;

@@ -7,23 +7,35 @@ function safeObjectId(id) {
 }
 
 module.exports = {
+  // ===============================
   // CREATE COMMENT
+  // POST /api/comments
+  // Body: { post_id, text }
+  // Auth: Bearer token
+  // ===============================
   addComment: async (req, res) => {
     try {
       const db = getDb();
-      const { post_id, user_id, username, text } = req.body;
+      const { post_id, text } = req.body;
 
       const postId = safeObjectId(post_id);
-      const userId = safeObjectId(user_id);
       if (!postId) return res.status(400).json({ error: 'Invalid post_id' });
-      if (!userId) return res.status(400).json({ error: 'Invalid user_id' });
-      if (!text || !text.trim()) return res.status(400).json({ error: 'Text is required' });
+
+      // ✅ userId теперь ТОЛЬКО из токена
+      const userId = safeObjectId(req.userId);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const cleanText = (text || '').trim();
+      if (!cleanText) return res.status(400).json({ error: 'Text is required' });
+
+      // ✅ username теперь тоже из токена (а не из body)
+      const authorName = req.user?.username || 'User';
 
       await db.collection('comments').insertOne({
         post_id: postId,
         user_id: userId,
-        author_name: username || 'User',
-        text: text.trim(),
+        author_name: authorName,
+        text: cleanText,
         created_at: new Date()
       });
 
@@ -33,17 +45,20 @@ module.exports = {
     }
   },
 
+  // ===============================
   // DELETE COMMENT (Advanced delete + authorization)
   // DELETE /api/comments/:id
-  // Body: { userId }
+  // Auth: Bearer token
+  // ===============================
   deleteComment: async (req, res) => {
     try {
       const db = getDb();
       const commentId = safeObjectId(req.params.id);
-      const userId = safeObjectId(req.body.userId);
-
       if (!commentId) return res.status(400).json({ error: 'Invalid comment id' });
-      if (!userId) return res.status(400).json({ error: 'Invalid userId' });
+
+      // ✅ userId теперь ТОЛЬКО из токена
+      const userId = safeObjectId(req.userId);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
       const comment = await db.collection('comments').findOne(
         { _id: commentId },
@@ -59,18 +74,23 @@ module.exports = {
     }
   },
 
-  // OPTIONAL UPDATE COMMENT ($set)
+  // ===============================
+  // UPDATE COMMENT ($set + authorization)
   // PUT /api/comments/:id
-  // Body: { userId, text }
+  // Body: { text }
+  // Auth: Bearer token
+  // ===============================
   updateComment: async (req, res) => {
     try {
       const db = getDb();
       const commentId = safeObjectId(req.params.id);
-      const userId = safeObjectId(req.body.userId);
-      const text = (req.body.text || '').trim();
-
       if (!commentId) return res.status(400).json({ error: 'Invalid comment id' });
-      if (!userId) return res.status(400).json({ error: 'Invalid userId' });
+
+      // ✅ userId теперь ТОЛЬКО из токена
+      const userId = safeObjectId(req.userId);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const text = (req.body.text || '').trim();
       if (!text) return res.status(400).json({ error: 'Text is required' });
 
       const comment = await db.collection('comments').findOne(

@@ -73,7 +73,6 @@ module.exports = {
         },
         { $sort: { likesCount: -1, created_at: -1 } },
         { $limit: 5 },
-        // join author for display
         {
           $lookup: {
             from: 'users',
@@ -171,19 +170,23 @@ module.exports = {
   // ===============================
   // CREATE POST
   // POST /api/posts
+  // Body: { content }
+  // Auth: Bearer token
   // ===============================
   createPost: async (req, res) => {
     try {
       const db = getDb();
-      const { user_id, content } = req.body;
 
-      const userId = safeObjectId(user_id);
-      if (!userId) return res.status(400).json({ error: 'Invalid user id' });
-      if (!content || !content.trim()) return res.status(400).json({ error: 'Content is required' });
+      // ✅ userId теперь ТОЛЬКО из токена
+      const userId = safeObjectId(req.userId);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const content = (req.body.content || '').trim();
+      if (!content) return res.status(400).json({ error: 'Content is required' });
 
       const newPost = {
         user_id: userId,
-        content: content.trim(),
+        content,
         created_at: new Date(),
         likes: []
       };
@@ -198,7 +201,8 @@ module.exports = {
   // ===============================
   // UPDATE POST (Advanced update: $set)
   // PUT /api/posts/:id
-  // Body: { userId, content }
+  // Body: { content }
+  // Auth: Bearer token
   // ===============================
   updatePost: async (req, res) => {
     try {
@@ -206,14 +210,18 @@ module.exports = {
       const postId = safeObjectId(req.params.id);
       if (!postId) return res.status(400).json({ error: 'Invalid post id' });
 
-      const userId = safeObjectId(req.body.userId);
-      if (!userId) return res.status(400).json({ error: 'Invalid userId' });
+      // ✅ userId теперь ТОЛЬКО из токена
+      const userId = safeObjectId(req.userId);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
       const content = (req.body.content || '').trim();
       if (!content) return res.status(400).json({ error: 'Content is required' });
 
       // authorization: only author can update
-      const post = await db.collection('posts').findOne({ _id: postId }, { projection: { user_id: 1 } });
+      const post = await db.collection('posts').findOne(
+        { _id: postId },
+        { projection: { user_id: 1 } }
+      );
       if (!post) return res.status(404).json({ error: 'Post not found' });
       if (!post.user_id.equals(userId)) return res.status(403).json({ error: 'Forbidden' });
 
@@ -230,18 +238,22 @@ module.exports = {
 
   // DELETE POST (Advanced delete + cascade)
   // DELETE /api/posts/:id
-  // Body: { userId }
+  // Auth: Bearer token
   deletePost: async (req, res) => {
     try {
       const db = getDb();
       const postId = safeObjectId(req.params.id);
       if (!postId) return res.status(400).json({ error: 'Invalid post id' });
 
-      const userId = safeObjectId(req.body.userId);
-      if (!userId) return res.status(400).json({ error: 'Invalid userId' });
+      // ✅ userId теперь ТОЛЬКО из токена
+      const userId = safeObjectId(req.userId);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
       // authorization: only author can delete
-      const post = await db.collection('posts').findOne({ _id: postId }, { projection: { user_id: 1 } });
+      const post = await db.collection('posts').findOne(
+        { _id: postId },
+        { projection: { user_id: 1 } }
+      );
       if (!post) return res.status(404).json({ error: 'Post not found' });
       if (!post.user_id.equals(userId)) return res.status(403).json({ error: 'Forbidden' });
 
@@ -257,21 +269,21 @@ module.exports = {
 
   // LIKE / UNLIKE (toggle)
   // POST /api/posts/:id/like
-  // Body: { userId }
+  // Auth: Bearer token
   likePost: async (req, res) => {
     try {
       const db = getDb();
       const postId = safeObjectId(req.params.id);
-      const userId = safeObjectId(req.body.userId);
-
       if (!postId) return res.status(400).json({ error: 'Invalid post id' });
-      if (!userId) return res.status(400).json({ error: 'Invalid userId' });
+
+      // ✅ userId теперь ТОЛЬКО из токена
+      const userId = safeObjectId(req.userId);
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
       const post = await db.collection('posts').findOne(
         { _id: postId },
         { projection: { likes: 1 } }
       );
-
       if (!post) return res.status(404).json({ error: 'Post not found' });
 
       const likes = Array.isArray(post.likes) ? post.likes : [];

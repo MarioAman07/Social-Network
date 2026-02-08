@@ -1,6 +1,8 @@
 const { getDb } = require('../config/db');
 const { ObjectId } = require('mongodb');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+
 
 module.exports = {
   // 1. Register User (Create)
@@ -33,31 +35,34 @@ module.exports = {
     }
   },
 
-  // 2. Login User (Authentication)
-  loginUser: async (req, res) => {
-    try {
-      const db = getDb();
-      const { email, password } = req.body;
+  // 2. Login User (Authentication) -> returns JWT
+loginUser: async (req, res) => {
+  try {
+    const db = getDb();
+    const { email, password } = req.body;
 
-      const user = await db.collection('users').findOne({ email });
-      if (!user) {
-        return res.status(400).json({ error: "User not found" });
-      }
+    const user = await db.collection('users').findOne({ email });
+    if (!user) return res.status(400).json({ error: "User not found" });
 
-      const isMatch = await bcrypt.compare(password, user.password_hash);
-      if (!isMatch) {
-        return res.status(400).json({ error: "Invalid password" });
-      }
+    const isMatch = await bcrypt.compare(password, user.password_hash);
+    if (!isMatch) return res.status(400).json({ error: "Invalid password" });
 
-      res.json({
-        message: "Login successful",
-        userId: user._id,
-        username: user.username
-      });
-    } catch (err) {
-      res.status(500).json({ error: err.message });
-    }
-  },
+    const token = jwt.sign(
+      { userId: user._id.toString(), role: user.role || 'user', username: user.username },
+      process.env.JWT_SECRET,
+      { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+    );
+
+    res.json({
+      message: "Login successful",
+      token,
+      userId: user._id,       // можно оставить для UI, но не использовать для авторизации
+      username: user.username
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+},
 
   // 3. Get User Stats (Aggregation) - FIXED FOR likes:[]
   getUserStats: async (req, res) => {

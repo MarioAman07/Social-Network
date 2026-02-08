@@ -3,9 +3,25 @@ const API_URL = '/api';
 /* AUTH HELPERS */
 
 function checkAuth() {
+  const token = localStorage.getItem('token');
   const userId = localStorage.getItem('userId');
-  if (!userId) window.location.href = '/index.html';
+  if (!token || !userId) window.location.href = '/index.html';
   return userId;
+}
+
+function authHeaders() {
+  const token = localStorage.getItem('token');
+  return token ? { 'Authorization': `Bearer ${token}` } : {};
+}
+
+function handleAuthError(res) {
+  if (res && res.status === 401) {
+    // token invalid/expired
+    localStorage.clear();
+    window.location.href = '/index.html';
+    return true;
+  }
+  return false;
 }
 
 function logout() {
@@ -13,7 +29,7 @@ function logout() {
   window.location.href = '/index.html';
 }
 
-/* HELPERS*/
+/* HELPERS */
 
 // Handles ObjectId formats: string | { $oid: "..." } | ObjectId-like
 function getId(value) {
@@ -33,7 +49,7 @@ function escapeHtml(str) {
     .replaceAll("'", '&#039;');
 }
 
-/*AUTH*/
+/* AUTH */
 
 async function handleLogin(e) {
   e.preventDefault();
@@ -54,8 +70,13 @@ async function handleLogin(e) {
     return;
   }
 
-  localStorage.setItem('userId', data.userId);
+  // ✅ JWT token
+  localStorage.setItem('token', data.token);
+
+  // можно хранить userId для UI, но НЕ использовать для авторизации
+  localStorage.setItem('userId', getId(data.userId) || data.userId);
   localStorage.setItem('username', data.username);
+
   window.location.href = '/feed.html';
 }
 
@@ -83,7 +104,7 @@ async function handleRegister(e) {
   window.location.href = '/index.html';
 }
 
-/*FEED*/
+/* FEED */
 
 async function loadFeed() {
   const currentUserId = checkAuth();
@@ -92,10 +113,15 @@ async function loadFeed() {
 
   feed.innerHTML = `<p class="empty">Loading posts...</p>`;
 
-  const res = await fetch(`${API_URL}/posts`);
-  const posts = await res.json();
+  // чтение можно оставить public, но Authorization не мешает
+  const res = await fetch(`${API_URL}/posts`, {
+    headers: { ...authHeaders() }
+  });
 
-  feed.innerHTML = ''; //no duplicates
+  if (handleAuthError(res)) return;
+
+  const posts = await res.json();
+  feed.innerHTML = '';
 
   if (!posts.length) {
     feed.innerHTML = `<p class="empty">No posts found</p>`;
@@ -160,70 +186,70 @@ function renderPost(post, currentUserId) {
     </div>
   `;
 
-  // LIKE / UNLIKE
+  // LIKE / UNLIKE  ✅ токен, без body userId
   postEl.querySelector('.js-like-btn').addEventListener('click', async () => {
-    await fetch(`${API_URL}/posts/${postId}/like`, {
+    const res = await fetch(`${API_URL}/posts/${postId}/like`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: currentUserId })
+      headers: { 'Content-Type': 'application/json', ...authHeaders() }
     });
+
+    if (handleAuthError(res)) return;
     loadFeed();
   });
 
-  // ADD COMMENT
+  // ADD COMMENT ✅ токен, без user_id/username
   postEl.querySelector('.js-comment-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const input = e.target.querySelector('.comment-input');
     const text = input.value.trim();
     if (!text) return;
 
-    await fetch(`${API_URL}/comments`, {
+    const res = await fetch(`${API_URL}/comments`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({
         post_id: postId,
-        user_id: currentUserId,
-        username: localStorage.getItem('username'),
         text
       })
     });
+
+    if (handleAuthError(res)) return;
 
     input.value = '';
     loadFeed();
   });
 
-  // OWNER: DELETE
+  // OWNER: DELETE ✅ токен, без body userId
   if (isOwner) {
     const deleteBtn = postEl.querySelector('.js-delete-btn');
     deleteBtn.addEventListener('click', async () => {
       const ok = confirm('Delete this post? This will also delete its comments.');
       if (!ok) return;
 
-      await fetch(`${API_URL}/posts/${postId}`, {
+      const res = await fetch(`${API_URL}/posts/${postId}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId: currentUserId })
+        headers: { 'Content-Type': 'application/json', ...authHeaders() }
       });
+
+      if (handleAuthError(res)) return;
 
       loadFeed();
     });
 
     // OWNER: EDIT (toggle edit mode)
     const editBtn = postEl.querySelector('.js-edit-btn');
-    editBtn.addEventListener('click', () => enterEditMode(postEl, postId, currentUserId, safeContent));
+    editBtn.addEventListener('click', () => enterEditMode(postEl, postId, safeContent));
   }
 
   return postEl;
 }
 
-function enterEditMode(postEl, postId, currentUserId, currentContent) {
-  // if already in edit mode - do nothing
+function enterEditMode(postEl, postId, currentContent) {
   if (postEl.querySelector('.edit-box')) return;
 
   const contentEl = postEl.querySelector('.js-post-content');
   const original = currentContent;
 
-  // Build edit UI (no inline styles, only classes)
   const box = document.createElement('div');
   box.className = 'edit-box';
 
@@ -238,17 +264,16 @@ function enterEditMode(postEl, postId, currentUserId, currentContent) {
   const textarea = box.querySelector('.edit-text');
   textarea.value = original;
 
-  // replace content with editor
   contentEl.replaceWith(box);
 
   box.querySelector('.edit-cancel').addEventListener('click', () => {
-    // restore original content node
     const restored = document.createElement('div');
     restored.className = 'post-content js-post-content';
     restored.innerHTML = original;
     box.replaceWith(restored);
   });
 
+  // SAVE EDIT ✅ токен, без body userId
   box.querySelector('.edit-save').addEventListener('click', async () => {
     const newText = textarea.value.trim();
     if (!newText) {
@@ -256,11 +281,13 @@ function enterEditMode(postEl, postId, currentUserId, currentContent) {
       return;
     }
 
-    await fetch(`${API_URL}/posts/${postId}`, {
+    const res = await fetch(`${API_URL}/posts/${postId}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: currentUserId, content: newText })
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
+      body: JSON.stringify({ content: newText })
     });
+
+    if (handleAuthError(res)) return;
 
     loadFeed();
   });
@@ -276,7 +303,7 @@ function renderComments(comments = []) {
   `).join('');
 }
 
-/*CREATE POST*/
+/* CREATE POST */
 
 async function createPost(e) {
   e.preventDefault();
@@ -287,20 +314,19 @@ async function createPost(e) {
   const content = contentEl.value.trim();
   if (!content) return;
 
-  await fetch(`${API_URL}/posts`, {
+  const res = await fetch(`${API_URL}/posts`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      user_id: localStorage.getItem('userId'),
-      content
-    })
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: JSON.stringify({ content })
   });
+
+  if (handleAuthError(res)) return;
 
   contentEl.value = '';
   loadFeed();
 }
 
-/*PROFILE STATS*/
+/* PROFILE STATS */
 
 async function loadStats() {
   const userId = checkAuth();
@@ -309,7 +335,12 @@ async function loadStats() {
 
   container.innerHTML = `<p class="empty">Loading...</p>`;
 
-  const res = await fetch(`${API_URL}/users/${userId}/stats`);
+  const res = await fetch(`${API_URL}/users/${userId}/stats`, {
+    headers: { ...authHeaders() }
+  });
+
+  if (handleAuthError(res)) return;
+
   const data = await res.json();
 
   const user = data.user || {};
@@ -330,6 +361,6 @@ async function loadStats() {
   `;
 }
 
-/*INIT*/
+/* INIT */
 
 if (document.getElementById('feed')) loadFeed();
