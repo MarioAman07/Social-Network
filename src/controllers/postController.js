@@ -217,13 +217,18 @@ module.exports = {
       const content = (req.body.content || '').trim();
       if (!content) return res.status(400).json({ error: 'Content is required' });
 
-      // authorization: only author can update
+      // authorization: author OR admin can update
       const post = await db.collection('posts').findOne(
         { _id: postId },
         { projection: { user_id: 1 } }
       );
       if (!post) return res.status(404).json({ error: 'Post not found' });
-      if (!post.user_id.equals(userId)) return res.status(403).json({ error: 'Forbidden' });
+
+      // ✅ NEW: admin override
+      const isOwner = post.user_id.equals(userId);
+      const isAdmin = req.user && req.user.role === 'admin';
+
+      if (!isOwner && !isAdmin) return res.status(403).json({ error: 'Forbidden' });
 
       await db.collection('posts').updateOne(
         { _id: postId },
@@ -249,13 +254,18 @@ module.exports = {
       const userId = safeObjectId(req.userId);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-      // authorization: only author can delete
+      // authorization: author OR admin can delete
       const post = await db.collection('posts').findOne(
         { _id: postId },
         { projection: { user_id: 1 } }
       );
       if (!post) return res.status(404).json({ error: 'Post not found' });
-      if (!post.user_id.equals(userId)) return res.status(403).json({ error: 'Forbidden' });
+
+      // ✅ NEW: admin override
+      const isOwner = post.user_id.equals(userId);
+      const isAdmin = req.user && req.user.role === 'admin';
+
+      if (!isOwner && !isAdmin) return res.status(403).json({ error: 'Forbidden' });
 
       // cascade delete comments
       await db.collection('comments').deleteMany({ post_id: postId });

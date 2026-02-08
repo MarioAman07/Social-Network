@@ -65,7 +65,12 @@ module.exports = {
         { projection: { user_id: 1 } }
       );
       if (!comment) return res.status(404).json({ error: 'Comment not found' });
-      if (!comment.user_id.equals(userId)) return res.status(403).json({ error: 'Forbidden' });
+
+      // ✅ NEW: owner OR admin
+      const isOwner = comment.user_id.equals(userId);
+      const isAdmin = req.user && req.user.role === 'admin';
+
+      if (!isOwner && !isAdmin) return res.status(403).json({ error: 'Forbidden' });
 
       await db.collection('comments').deleteOne({ _id: commentId });
       res.json({ message: 'Comment deleted' });
@@ -98,7 +103,12 @@ module.exports = {
         { projection: { user_id: 1 } }
       );
       if (!comment) return res.status(404).json({ error: 'Comment not found' });
-      if (!comment.user_id.equals(userId)) return res.status(403).json({ error: 'Forbidden' });
+
+      // ✅ NEW: owner OR admin
+      const isOwner = comment.user_id.equals(userId);
+      const isAdmin = req.user && req.user.role === 'admin';
+
+      if (!isOwner && !isAdmin) return res.status(403).json({ error: 'Forbidden' });
 
       await db.collection('comments').updateOne(
         { _id: commentId },

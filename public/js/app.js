@@ -49,6 +49,10 @@ function escapeHtml(str) {
     .replaceAll("'", '&#039;');
 }
 
+function getRole() {
+  return localStorage.getItem('role') || 'user';
+}
+
 /* AUTH */
 
 async function handleLogin(e) {
@@ -57,10 +61,14 @@ async function handleLogin(e) {
   const email = document.getElementById('email')?.value;
   const password = document.getElementById('password')?.value;
 
+  // ✅ admin mode controls (index.html)
+  const adminLogin = !!document.getElementById('adminLogin')?.checked;
+  const adminSecret = document.getElementById('adminSecret')?.value || '';
+
   const res = await fetch(`${API_URL}/users/login`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password })
+    body: JSON.stringify({ email, password, adminLogin, adminSecret })
   });
 
   const data = await res.json();
@@ -76,6 +84,9 @@ async function handleLogin(e) {
   // можно хранить userId для UI, но НЕ использовать для авторизации
   localStorage.setItem('userId', getId(data.userId) || data.userId);
   localStorage.setItem('username', data.username);
+
+  // ✅ NEW: role для UI (кнопки модерации)
+  localStorage.setItem('role', data.role || 'user');
 
   window.location.href = '/feed.html';
 }
@@ -139,6 +150,10 @@ function renderPost(post, currentUserId) {
   const authorId = getId(post.user_id);
 
   const isOwner = authorId && authorId === currentUserId;
+  const isAdmin = getRole() === 'admin';
+
+  // ✅ NEW: admin can moderate any post
+  const canModeratePost = isOwner || isAdmin;
 
   // like state (works if backend returns likes array)
   const liked = Array.isArray(post.likes)
@@ -169,16 +184,16 @@ function renderPost(post, currentUserId) {
 
       <span class="comment-count">💬 ${post.commentsCount || 0}</span>
 
-      ${isOwner ? `
+      ${canModeratePost ? `
         <div class="post-owner-actions">
-          <button class="post-action-btn js-edit-btn" type="button">Edit</button>
-          <button class="post-action-btn danger js-delete-btn" type="button">Delete</button>
+          <button class="post-action-btn js-edit-btn" type="button">${isOwner ? 'Edit' : 'Edit (admin)'}</button>
+          <button class="post-action-btn danger js-delete-btn" type="button">${isOwner ? 'Delete' : 'Delete (admin)'}</button>
         </div>
       ` : ''}
     </div>
 
     <div class="comments">
-      ${renderComments(post.post_comments)}
+      ${renderComments(post.post_comments, currentUserId, isAdmin)}
       <form class="comment-form js-comment-form">
         <input type="text" class="comment-input" placeholder="Write a comment..." />
         <button type="submit">Send</button>
@@ -219,8 +234,8 @@ function renderPost(post, currentUserId) {
     loadFeed();
   });
 
-  // OWNER: DELETE ✅ токен, без body userId
-  if (isOwner) {
+  // DELETE / EDIT (Owner OR Admin)
+  if (canModeratePost) {
     const deleteBtn = postEl.querySelector('.js-delete-btn');
     deleteBtn.addEventListener('click', async () => {
       const ok = confirm('Delete this post? This will also delete its comments.');
@@ -233,10 +248,16 @@ function renderPost(post, currentUserId) {
 
       if (handleAuthError(res)) return;
 
+      // если не owner и не 401, может быть 403
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(data.error || 'Delete failed');
+        return;
+      }
+
       loadFeed();
     });
 
-    // OWNER: EDIT (toggle edit mode)
     const editBtn = postEl.querySelector('.js-edit-btn');
     editBtn.addEventListener('click', () => enterEditMode(postEl, postId, safeContent));
   }
@@ -289,18 +310,37 @@ function enterEditMode(postEl, postId, currentContent) {
 
     if (handleAuthError(res)) return;
 
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      alert(data.error || 'Update failed');
+      return;
+    }
+
     loadFeed();
   });
 }
 
-function renderComments(comments = []) {
+function renderComments(comments = [], currentUserId, isAdmin) {
   if (!comments.length) return `<div class="no-comments">No comments yet</div>`;
 
-  return comments.map(c => `
-    <div class="comment">
-      <strong>${escapeHtml(c.author_name || 'User')}:</strong> ${escapeHtml(c.text || '')}
-    </div>
-  `).join('');
+  return comments.map(c => {
+    const commentId = getId(c._id);
+    const commentOwnerId = getId(c.user_id);
+    const canModerateComment = (commentOwnerId && commentOwnerId === currentUserId) || isAdmin;
+
+    return `
+      <div class="comment" style="display:flex;gap:10px;align-items:center;justify-content:space-between;">
+        <div>
+          <strong>${escapeHtml(c.author_name || 'User')}:</strong> ${escapeHtml(c.text || '')}
+        </div>
+        ${canModerateComment ? `
+          <button class="post-action-btn danger js-del-comment" data-id="${commentId}" type="button" style="padding:6px 10px;border-radius:10px;">
+            Delete
+          </button>
+        ` : ''}
+      </div>
+    `;
+  }).join('');
 }
 
 /* CREATE POST */
@@ -321,6 +361,12 @@ async function createPost(e) {
   });
 
   if (handleAuthError(res)) return;
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    alert(data.error || 'Create post failed');
+    return;
+  }
 
   contentEl.value = '';
   loadFeed();
@@ -346,6 +392,9 @@ async function loadStats() {
   const user = data.user || {};
   const stats = data.stats || {};
 
+  // ✅ если вдруг роль не сохранилась — подстрахуемся
+  if (user.role) localStorage.setItem('role', user.role);
+
   container.innerHTML = `
     <div class="card center">
       <img class="avatar profile-avatar" src="${user.avatar_url || 'https://placehold.co/100'}" alt="avatar" />
@@ -360,6 +409,34 @@ async function loadStats() {
     </div>
   `;
 }
+
+/* COMMENT DELETE CLICK (delegation) */
+
+document.addEventListener('click', async (e) => {
+  const btn = e.target.closest('.js-del-comment');
+  if (!btn) return;
+
+  const id = btn.getAttribute('data-id');
+  if (!id) return;
+
+  const ok = confirm('Delete this comment?');
+  if (!ok) return;
+
+  const res = await fetch(`${API_URL}/comments/${id}`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() }
+  });
+
+  if (handleAuthError(res)) return;
+
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    alert(data.error || 'Delete comment failed');
+    return;
+  }
+
+  loadFeed();
+});
 
 /* INIT */
 
