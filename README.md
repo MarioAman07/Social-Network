@@ -158,6 +158,7 @@ The project uses a combination of **referenced data** and **embedded data**:
 | Method | Endpoint | Description |
 |------|---------|-------------|
 | GET | `/api/posts` | Get all posts (aggregation feed) |
+| GET | `/api/posts/top` | Get top posts |
 | GET | `/api/posts/:id` | Get single post |
 | POST | `/api/posts` | Create post |
 | PUT | `/api/posts/:id` | Update post |
