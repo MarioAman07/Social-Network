@@ -1,85 +1,62 @@
-# Social Network Web Application (NoSQL Final Project)
-**Student:** Aman Baku  
-**Group:** SE-2422
+# Social Network Web Application
 
-## Project Overview
-This project is a web-based social network application developed as the endterm project for the course **Advanced Databases (NoSQL)**.
-
-The goal of the project is to demonstrate practical skills in:
-- designing NoSQL data models,
-- implementing MongoDB CRUD operations,
-- using advanced update and delete operators,
-- building aggregation pipelines with real business meaning,
-- developing a RESTful backend and integrating it with a frontend.
-
-The application allows users to:
-- register and log in,
-- create, view, update, and delete posts,
-- like and unlike posts,
-- write comments,
-- view profile statistics,
-- view top posts based on popularity.
-
----
-
-## System Architecture
-The system follows a classic **three-layer architecture**:
-
-Frontend (HTML, CSS, JavaScript)  
-↓ REST API (HTTP/JSON)  
-Backend (Node.js, Express)  
-↓ MongoDB Native Driver  
-MongoDB Atlas (NoSQL Database)  
+**Course:** Advanced Databases (NoSQL)  
+**Project Type:** Final Project  
+**Technology Stack:** MongoDB, Node.js, Express.js, HTML, CSS, JavaScript  
+**Group:** SE-2422  
+**Student** Aman Baku
 
 
-- The **frontend** is implemented using vanilla HTML, CSS, and JavaScript.
-- The **backend** exposes a RESTful API built with Express.js.
-- **MongoDB Atlas** is used as the primary database.
-- Database operations are implemented using the **MongoDB Native Driver**.
+## 1. Project Overview
+This project is a full-stack web application developed as a final project for the **Advanced Databases (NoSQL)** course.  
+The application represents a simplified social network where users can create posts, like them, and leave comments.
 
----
+The primary goal of the project is to demonstrate practical skills in:
+- NoSQL data modeling using MongoDB
+- Aggregation pipelines with real business meaning
+- Backend logic built around MongoDB
+- RESTful API design
+- Authentication and authorization
+- Database indexing and optimization
 
-## Technology Stack
-- **Backend:** Node.js, Express.js
-- **Database:** MongoDB Atlas
-- **Driver:** MongoDB Native Driver
-- **Authentication:** bcryptjs
-- **Frontend:** HTML, CSS, JavaScript (Vanilla)
-- **Environment Configuration:** dotenv
 
----
+## 2. System Architecture
 
-## Setup and Run Instructions
+The system follows a **client–server architecture**.
 
-### 1. Install dependencies
-```bash
-npm install
-```
+### Frontend
+- Implemented using HTML, CSS, and vanilla JavaScript
+- Responsible for user interaction (login, feed, profile, comments)
+- Communicates with the backend via REST API using HTTP requests
 
-### 2. Environment configuration
-Create a .env file in the project root:
-```bash
-MONGO_URI=your_mongodb_atlas_connection_string
-PORT=3000
-```
+### Backend
+- Built with Node.js and Express.js
+- Implements business logic and API endpoints
+- Uses JWT for authentication and role-based authorization
 
-### 3. Seed the database (optional)
-```bash
-node seed_atlas.js
-```
+### Database
+- MongoDB Atlas
+- Native MongoDB Driver
+- Stores users, posts, comments, and likes
 
-### 4. Start the Project
-```bash
-npm start
-```
-The application will be available at:
-```bash
-http://localhost:3000
-```
+### Data Flow
+1. The user interacts with the frontend interface.
+2. The frontend sends HTTP requests to the backend API.
+3. The backend authenticates the user using JWT.
+4. Authorization rules are applied based on user roles.
+5. MongoDB executes CRUD operations or aggregation pipelines.
+6. The backend returns JSON responses.
+7. The frontend renders updated data.
 
-## Database Schema Description
-### Users Collection
-```bash
+
+## 3. Database Documentation
+
+### Collections Overview
+
+#### 1. Users Collection (`users`)
+Stores registered user accounts.
+
+```json
 {
   "_id": ObjectId,
   "username": "string",
@@ -87,127 +64,154 @@ http://localhost:3000
   "password_hash": "string",
   "bio": "string",
   "avatar_url": "string",
-  "created_at": "date",
-  "role": "string"
+  "role": "user | admin",
+  "created_at": "Date"
 }
 ```
-### Posts Collection
-```bash
+
+#### 2. Posts Collection (posts)
+Stores user-generated posts.
+
+```json
 {
   "_id": ObjectId,
   "user_id": ObjectId,
   "content": "string",
-  "created_at": "date",
+  "created_at": "Date",
   "likes": [ObjectId]
 }
 ```
 
-### Comments Collection
-```bash
+#### 3. Comments Collection (comments)
+Stores comments related to posts.
+
+```json
 {
   "_id": ObjectId,
   "post_id": ObjectId,
   "user_id": ObjectId,
   "author_name": "string",
   "text": "string",
-  "created_at": "date"
+  "created_at": "Date"
 }
 ```
 
-### Data Modeling Approach
-- **Referenced documents:** users ↔ posts ↔ comments
-- **Embedded data:** likes array inside posts
-- This hybrid approach balances flexibility and performance.
+## Relationships
 
-## REST API Endpoints
+- `posts.user_id` → references `users._id`
+- `comments.user_id` → references `users._id`
+- `comments.post_id` → references `posts._id`
+- `posts.likes` → array of references to `users._id`
+
+The project uses a combination of **referenced data** and **embedded data**:
+
+- References are used for users, posts, and comments
+- Likes are stored as embedded references inside posts
+
+
+## 4. MongoDB Queries and Aggregations
+
+### Aggregation Examples
+
+#### Feed Aggregation
+- Sort posts by creation date
+- Join comments and author details
+- Calculate likes and comments count
+
+**Stages used:**
+- `$sort`
+- `$lookup`
+- `$unwind`
+- `$addFields`
+
+#### User Statistics Aggregation
+- Count total posts per user
+- Calculate total likes received
+
+**Stages used:**
+- `$match`
+- `$addFields`
+- `$group`
+
+#### Top Posts Aggregation
+- Sort posts by number of likes
+- Return most popular posts
+
+
+## 5. API Documentation
 
 ### Authentication
-| Method | Endpoint | Description |
-|------|--------|------------|
-| POST | `/api/users/register` | Register a new user |
-| POST | `/api/users/login` | Authenticate user |
 
----
+| Method | Endpoint | Description |
+|------|---------|-------------|
+| POST | `/api/users/register` | Register new user |
+| POST | `/api/users/login` | Login and receive JWT |
+
+### Users
+
+| Method | Endpoint | Description |
+|------|---------|-------------|
+| GET | `/api/users/:id/stats` | Get user statistics (aggregation) |
 
 ### Posts
-| Method | Endpoint | Description |
-|------|--------|------------|
-| GET | `/api/posts` | Get all posts |
-| GET | `/api/posts/:id` | Get post by ID |
-| POST | `/api/posts` | Create new post |
-| PUT | `/api/posts/:id` | Update post (author only) |
-| DELETE | `/api/posts/:id` | Delete post with cascade delete |
 
----
+| Method | Endpoint | Description |
+|------|---------|-------------|
+| GET | `/api/posts` | Get all posts (aggregation feed) |
+| GET | `/api/posts/:id` | Get single post |
+| POST | `/api/posts` | Create post |
+| PUT | `/api/posts/:id` | Update post |
+| DELETE | `/api/posts/:id` | Delete post |
+| POST | `/api/posts/:id/like` | Like or unlike post |
 
 ### Comments
+
 | Method | Endpoint | Description |
-|------|--------|------------|
+|------|---------|-------------|
 | POST | `/api/comments` | Add comment |
-| GET | `/api/posts/:id/comments` | Get post comments |
-| DELETE | `/api/comments/:id` | Delete comment (author only) |
+| PUT | `/api/comments/:id` | Update comment |
+| DELETE | `/api/comments/:id` | Delete comment |
 
----
 
-### Likes & Aggregation
-| Method | Endpoint | Description |
-|------|--------|------------|
-| POST | `/api/posts/:id/like` | Like / Unlike post |
-| GET | `/api/users/:id/stats` | Get user statistics |
+## 6. Indexing and Optimization Strategy
 
----
+To improve performance, the following indexes are used:
 
-## MongoDB Queries and Aggregations
+- **`users.email` (unique index)**  
+  Used for fast login and registration checks.
 
-### Example: Like Toggle (Advanced Update)
-```js
-$addToSet: { likes: userId }
-$pull: { likes: userId }
-```
+- **`users.username`**  
+  Optimizes user lookups.
 
-### Example: Cascade Delete
-```js
-db.posts.deleteOne({ _id: postId });
-```
+- **`posts.user_id + created_at` (compound index)**  
+  Optimizes feed queries and user post retrieval.
 
-### Example: Aggregation Pipeline (Top Posts)
-```js
-[
-  { $addFields: { likesCount: { $size: "$likes" } } },
-  { $sort: { likesCount: -1 } },
-  { $limit: 5 }
-]
-```
+- **`comments.post_id + created_at` (compound index)**  
+  Optimizes comment retrieval for posts.
 
-## Indexing and Optimization Strategy
+These indexes reduce query execution time and improve scalability.
 
-### Indexes Used
-- `users.email` (**unique**) – fast authentication
-- `posts.user_id, posts.created_at` – optimized feed queries
-- `comments.post_id, comments.created_at` – fast comment loading
 
-### Optimization Rationale
-- Compound indexes reduce query execution time for common access patterns.
-- Aggregation pipelines use indexed fields where possible.
-- Data modeling minimizes expensive joins.
+## 7. Security and Authorization
 
----
+- JWT-based authentication
+- Passwords stored as hashed values using `bcrypt`
+- Role-based access control:
+  - **User**: can manage only own posts and comments
+  - **Admin**: can moderate and delete any post or comment
+- Authorization is enforced strictly on the backend
 
-## Security Considerations
-- Passwords are stored using **bcrypt hashing**
-- Authorization checks ensure:
-  - only post authors can edit or delete posts
-  - only comment authors can delete comments
-- Environment variables are managed using `.env`
 
----
+## 8. Contribution
 
-## Contribution
-- **Single student project**
-- All backend, database design, frontend, and documentation were implemented by the author.
+This project was completed by 1 student.
 
----
+**Author:** Aman Baku
 
-## Conclusion
-This project demonstrates a complete NoSQL-based web application with real-world business logic.  
-It satisfies all course requirements, including CRUD operations, advanced MongoDB features, aggregation pipelines, indexing strategies, and REST API design.
+All design, implementation, and documentation tasks were performed by the author.
+
+
+## 9. Conclusion
+
+This project demonstrates the practical use of MongoDB in a real-world web application.  
+It covers advanced NoSQL concepts such as aggregation pipelines, data modeling, indexing, authentication, and authorization, fulfilling all requirements of the **Advanced Databases (NoSQL)** course.
