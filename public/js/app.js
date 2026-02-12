@@ -1,6 +1,6 @@
 const API_URL = '/api';
 
-/* AUTH HELPERS */
+/* auth helpers */
 
 function checkAuth() {
   const token = localStorage.getItem('token');
@@ -29,7 +29,7 @@ function logout() {
   window.location.href = '/index.html';
 }
 
-/* HELPERS */
+/* helpers */
 
 // Handles ObjectId formats: string | { $oid: "..." } | ObjectId-like
 function getId(value) {
@@ -53,7 +53,7 @@ function getRole() {
   return localStorage.getItem('role') || 'user';
 }
 
-/* AUTH */
+/* auth */
 
 async function handleLogin(e) {
   e.preventDefault();
@@ -61,7 +61,7 @@ async function handleLogin(e) {
   const email = document.getElementById('email')?.value;
   const password = document.getElementById('password')?.value;
 
-  // ✅ admin mode controls (index.html)
+  // admin mode controls (index.html)
   const adminLogin = !!document.getElementById('adminLogin')?.checked;
   const adminSecret = document.getElementById('adminSecret')?.value || '';
 
@@ -78,14 +78,13 @@ async function handleLogin(e) {
     return;
   }
 
-  // ✅ JWT token
+  // JWT token
   localStorage.setItem('token', data.token);
 
-  // можно хранить userId для UI, но НЕ использовать для авторизации
   localStorage.setItem('userId', getId(data.userId) || data.userId);
   localStorage.setItem('username', data.username);
 
-  // ✅ NEW: role для UI (кнопки модерации)
+  // role for UI
   localStorage.setItem('role', data.role || 'user');
 
   window.location.href = '/feed.html';
@@ -115,7 +114,7 @@ async function handleRegister(e) {
   window.location.href = '/index.html';
 }
 
-/* FEED */
+/* feed */
 
 async function loadFeed() {
   const currentUserId = checkAuth();
@@ -124,7 +123,6 @@ async function loadFeed() {
 
   feed.innerHTML = `<p class="empty">Loading posts...</p>`;
 
-  // чтение можно оставить public, но Authorization не мешает
   const res = await fetch(`${API_URL}/posts`, {
     headers: { ...authHeaders() }
   });
@@ -152,7 +150,7 @@ function renderPost(post, currentUserId) {
   const isOwner = authorId && authorId === currentUserId;
   const isAdmin = getRole() === 'admin';
 
-  // ✅ NEW: admin can moderate any post
+  // admin can moderate any post
   const canModeratePost = isOwner || isAdmin;
 
   // like state (works if backend returns likes array)
@@ -201,7 +199,7 @@ function renderPost(post, currentUserId) {
     </div>
   `;
 
-  // LIKE / UNLIKE  ✅ токен, без body userId
+  // like/unlike token, without body userId
   postEl.querySelector('.js-like-btn').addEventListener('click', async () => {
     const res = await fetch(`${API_URL}/posts/${postId}/like`, {
       method: 'POST',
@@ -212,7 +210,7 @@ function renderPost(post, currentUserId) {
     loadFeed();
   });
 
-  // ADD COMMENT ✅ токен, без user_id/username
+  // add comment token, without user_id/username
   postEl.querySelector('.js-comment-form').addEventListener('submit', async (e) => {
     e.preventDefault();
     const input = e.target.querySelector('.comment-input');
@@ -234,7 +232,7 @@ function renderPost(post, currentUserId) {
     loadFeed();
   });
 
-  // DELETE / EDIT (Owner OR Admin)
+  // delete/edit (Owner OR Admin)
   if (canModeratePost) {
     const deleteBtn = postEl.querySelector('.js-delete-btn');
     deleteBtn.addEventListener('click', async () => {
@@ -248,7 +246,6 @@ function renderPost(post, currentUserId) {
 
       if (handleAuthError(res)) return;
 
-      // если не owner и не 401, может быть 403
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
         alert(data.error || 'Delete failed');
@@ -294,7 +291,7 @@ function enterEditMode(postEl, postId, currentContent) {
     box.replaceWith(restored);
   });
 
-  // SAVE EDIT ✅ токен, без body userId
+  // save edit token, without body userId
   box.querySelector('.edit-save').addEventListener('click', async () => {
     const newText = textarea.value.trim();
     if (!newText) {
@@ -343,7 +340,7 @@ function renderComments(comments = [], currentUserId, isAdmin) {
   }).join('');
 }
 
-/* CREATE POST */
+/* create post */
 
 async function createPost(e) {
   e.preventDefault();
@@ -372,7 +369,7 @@ async function createPost(e) {
   loadFeed();
 }
 
-/* PROFILE STATS */
+/* profile stats */
 
 async function loadStats() {
   const userId = checkAuth();
@@ -392,7 +389,6 @@ async function loadStats() {
   const user = data.user || {};
   const stats = data.stats || {};
 
-  // ✅ если вдруг роль не сохранилась — подстрахуемся
   if (user.role) localStorage.setItem('role', user.role);
 
   container.innerHTML = `
@@ -410,7 +406,7 @@ async function loadStats() {
   `;
 }
 
-/* COMMENT DELETE CLICK (delegation) */
+/* comment delete click(delegation) */
 
 document.addEventListener('click', async (e) => {
   const btn = e.target.closest('.js-del-comment');
@@ -438,6 +434,6 @@ document.addEventListener('click', async (e) => {
   loadFeed();
 });
 
-/* INIT */
+/* init */
 
 if (document.getElementById('feed')) loadFeed();

@@ -3,7 +3,6 @@ const router = express.Router();
 const userController = require('../controllers/userController');
 const auth = require('../middleware/auth');
 
-// ✅ NEW
 const { getDb } = require('../config/db');
 const { requireAdmin } = require('../middleware/roles');
 
@@ -11,7 +10,6 @@ router.post('/register', userController.registerUser);
 router.post('/login', userController.loginUser);
 router.get('/:id/stats', auth, userController.getUserStats);
 
-// ✅ NEW: admin-only list of users
 router.get('/', auth, requireAdmin, async (req, res) => {
   try {
     const db = getDb();

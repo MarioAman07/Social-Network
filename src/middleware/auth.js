@@ -13,7 +13,7 @@ function auth(req, res, next) {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
     // payload: { userId, role, username, iat, exp }
     req.user = payload;
-    req.userId = payload.userId; // удобный shortcut
+    req.userId = payload.userId;//shortcut
     next();
   } catch (e) {
     return res.status(401).json({ error: 'Unauthorized: invalid token' });

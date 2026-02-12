@@ -23,7 +23,7 @@ async function run() {
     await db.collection("posts").deleteMany({});
     await db.collection("users").deleteMany({});
 
-    // ---- USERS ----
+    // users
     const user1Id = new ObjectId();
     const user2Id = new ObjectId();
     const user3Id = new ObjectId();
@@ -65,7 +65,7 @@ async function run() {
     ];
     await db.collection("users").insertMany(users);
 
-    // ---- POSTS ----
+    // posts
     const post1Id = new ObjectId();
 
     console.log("Creating posts...");
@@ -78,7 +78,7 @@ async function run() {
       likes: []
     });
 
-    // ---- COMMENTS ----
+    // comments
     console.log("Creating comments...");
     await db.collection("comments").insertMany([
       {
@@ -99,7 +99,7 @@ async function run() {
 
     
 
-    // ---- INDEXES ----
+    // indexes
     console.log("Creating indexes...");
     await db.collection("users").createIndex({ email: 1 }, { unique: true });
     await db.collection("users").createIndex({ username: 1 });

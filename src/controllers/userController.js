@@ -47,7 +47,6 @@ module.exports = {
       const isMatch = await bcrypt.compare(password, user.password_hash);
       if (!isMatch) return res.status(400).json({ error: "Invalid password" });
 
-      // ✅ если пытаемся войти в admin-mode — сервер проверяет
       if (adminLogin) {
         const isAdminUser = (user.role || 'user') === 'admin';
         const secretOk = (adminSecret || '') === (process.env.ADMIN_LOGIN_SECRET || '');
@@ -66,16 +65,16 @@ module.exports = {
       res.json({
         message: "Login successful",
         token,
-        userId: user._id,       // можно оставить для UI, но не использовать для авторизации
+        userId: user._id,
         username: user.username,
-        role: user.role || 'user' // ✅ NEW: фронту нужно чтобы показать admin-кнопки
+        role: user.role || 'user'
       });
     } catch (err) {
       res.status(500).json({ error: err.message });
     }
   },
 
-  // 3. Get User Stats (Aggregation) - FIXED FOR likes:[]
+  // 3. Get User Stats (Aggregation) - fixed for likes:[]
   getUserStats: async (req, res) => {
     try {
       const db = getDb();

@@ -7,9 +7,7 @@ function safeObjectId(id) {
 }
 
 module.exports = {
-  // ===============================
   // GET ALL POSTS (aggregation)
-  // ===============================
   getAllPosts: async (req, res) => {
     try {
       const db = getDb();
@@ -55,10 +53,8 @@ module.exports = {
     }
   },
 
-  // ===============================
-  // BONUS: TOP POSTS (aggregation)
-  // GET /api/posts/top
-  // ===============================
+  // bonus: top posts (aggregation)
+  // get /api/posts/top
   getTopPosts: async (req, res) => {
     try {
       const db = getDb();
@@ -95,10 +91,8 @@ module.exports = {
     }
   },
 
-  // ===============================
-  // GET ONE POST
-  // GET /api/posts/:id
-  // ===============================
+  // get one post
+  // get /api/posts/:id
   getPostById: async (req, res) => {
     try {
       const db = getDb();
@@ -146,10 +140,8 @@ module.exports = {
     }
   },
 
-  // ===============================
-  // GET COMMENTS OF POST
-  // GET /api/posts/:id/comments
-  // ===============================
+  // get comments or post
+  // get /api/posts/:id/comments
   getPostComments: async (req, res) => {
     try {
       const db = getDb();
@@ -167,17 +159,15 @@ module.exports = {
     }
   },
 
-  // ===============================
-  // CREATE POST
-  // POST /api/posts
+  // create post
+  // post /api/posts
   // Body: { content }
   // Auth: Bearer token
-  // ===============================
   createPost: async (req, res) => {
     try {
       const db = getDb();
 
-      // ✅ userId теперь ТОЛЬКО из токена
+      // userId taken only from token
       const userId = safeObjectId(req.userId);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
@@ -198,19 +188,17 @@ module.exports = {
     }
   },
 
-  // ===============================
-  // UPDATE POST (Advanced update: $set)
-  // PUT /api/posts/:id
+  // update post (Advanced update: $set)
+  // put /api/posts/:id
   // Body: { content }
   // Auth: Bearer token
-  // ===============================
   updatePost: async (req, res) => {
     try {
       const db = getDb();
       const postId = safeObjectId(req.params.id);
       if (!postId) return res.status(400).json({ error: 'Invalid post id' });
 
-      // ✅ userId теперь ТОЛЬКО из токена
+      // userId only from token
       const userId = safeObjectId(req.userId);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
@@ -224,7 +212,7 @@ module.exports = {
       );
       if (!post) return res.status(404).json({ error: 'Post not found' });
 
-      // ✅ NEW: admin override
+      // admin override
       const isOwner = post.user_id.equals(userId);
       const isAdmin = req.user && req.user.role === 'admin';
 
@@ -241,8 +229,8 @@ module.exports = {
     }
   },
 
-  // DELETE POST (Advanced delete + cascade)
-  // DELETE /api/posts/:id
+  // delete post (Advanced delete + cascade)
+  // delete /api/posts/:id
   // Auth: Bearer token
   deletePost: async (req, res) => {
     try {
@@ -250,7 +238,7 @@ module.exports = {
       const postId = safeObjectId(req.params.id);
       if (!postId) return res.status(400).json({ error: 'Invalid post id' });
 
-      // ✅ userId теперь ТОЛЬКО из токена
+      // userId теперь ТОЛЬКО из токена
       const userId = safeObjectId(req.userId);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
@@ -261,7 +249,7 @@ module.exports = {
       );
       if (!post) return res.status(404).json({ error: 'Post not found' });
 
-      // ✅ NEW: admin override
+      // admin override
       const isOwner = post.user_id.equals(userId);
       const isAdmin = req.user && req.user.role === 'admin';
 
@@ -277,8 +265,8 @@ module.exports = {
     }
   },
 
-  // LIKE / UNLIKE (toggle)
-  // POST /api/posts/:id/like
+  // like/unlike (toggle)
+  // post /api/posts/:id/like
   // Auth: Bearer token
   likePost: async (req, res) => {
     try {
@@ -286,7 +274,7 @@ module.exports = {
       const postId = safeObjectId(req.params.id);
       if (!postId) return res.status(400).json({ error: 'Invalid post id' });
 
-      // ✅ userId теперь ТОЛЬКО из токена
+      // userId taken from token
       const userId = safeObjectId(req.userId);
       if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 

@@ -16,7 +16,7 @@ app.use(cors());
 
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Подключение API Роутов
+// connection of API routes
 app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/comments', commentRoutes);
@@ -36,7 +36,7 @@ connectToDb((err) => {
   }
 });
 
-// Обработка 404 (Если API не найдено)
+// 404 handler
 app.use((req, res) => {
   res.status(404).json({ error: "Endpoint not found" });
 });
